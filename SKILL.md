@@ -1,13 +1,13 @@
 ---
 name: pdf-handout-cleaner
-description: Remove the known large center light-gray watermark from image-based Chinese teaching PDFs without downsampling or size-oriented compression. Use for requests such as "去中间水印", "去中间浅灰水印", or "只去水印不要压缩". Do not use for side, dark, colored, unknown, or vector/text-layer watermarks without inspecting the PDF first.
+description: Remove the known large center light-gray watermark from image-based Chinese teaching PDFs while preserving native pixel dimensions and keeping output size close to the original. Use for requests such as "去中间水印", "去中间浅灰水印", or "只去水印不要明显改变大小". Do not use for side, dark, colored, unknown, or vector/text-layer watermarks without inspecting the PDF first.
 metadata:
-  short-description: Remove center gray PDF watermarks losslessly
+  short-description: Remove center watermarks at near-original size
 ---
 
 # PDF Center Watermark Remover
 
-Remove only the known large pale-gray watermark in the middle of image-based teaching PDFs. Preserve each page's native pixel dimensions and rebuild with lossless PNG images. Do not render at 300 DPI and do not optimize for file size.
+Remove only the known large pale-gray watermark in the middle of image-based teaching PDFs. Preserve every page's native pixel dimensions and adapt JPEG quality so the final PDF remains within 95%-105% of the original file size. Do not render at 300 DPI.
 
 ## Preflight
 
@@ -31,11 +31,13 @@ Without `--replace`, the script writes `NAME.cleaned.pdf`. Use `--backup` only w
 - Extract the full-page image at its native resolution.
 - Protect dark text and nearby antialiasing pixels.
 - In the center region only, whiten neutral light-gray pixels that are not connected to dark content.
-- Rebuild the PDF from lossless PNG pages at the original page dimensions.
+- Re-encode each cleaned page as JPEG at the quality closest to that page's original embedded-image size.
+- Rebuild at the original page dimensions without downsampling.
 
 ## Validation
 
 - Work through a temporary output and replace the source only after success.
 - Require identical page count and page dimensions.
-- Do not reject file-size growth; lossless output is expected to be larger.
+- Require final size to remain between 95% and 105% of the source PDF.
+- If the size check fails, leave the original untouched and report the failure.
 - For a new watermark design, inspect a sample before batch processing.

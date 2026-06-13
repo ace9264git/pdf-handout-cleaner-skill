@@ -15,7 +15,7 @@ from pathlib import Path
 import fitz
 
 
-WORKER = Path(__file__).with_name("watermark_page_worker.py")
+WORKER = Path(__file__).with_name("watermark_book_worker.py")
 
 
 def human_size(num: int) -> str:
@@ -48,19 +48,13 @@ def process_pdf(pdf: Path, args: argparse.Namespace) -> str:
 
     with tempfile.TemporaryDirectory(prefix="pdf-watermark-remover-") as temp_name:
         temp_dir = Path(temp_name)
-        page_pdfs: list[Path] = []
-
-        for page_number in range(len(original_rects)):
-            page_pdf = temp_dir / f"page-{page_number + 1:04d}.pdf"
-            command = [
-                sys.executable,
-                str(WORKER),
-                "--pdf",
-                str(pdf),
-                "--page",
-                str(page_number),
-                "--output",
-                str(page_pdf),
+        command = [
+            sys.executable,
+            str(WORKER),
+            "--pdf",
+            str(pdf),
+            "--output-dir",
+            str(temp_dir),
                 "--gray-min",
                 str(args.gray_min),
                 "--gray-max",
@@ -79,24 +73,29 @@ def process_pdf(pdf: Path, args: argparse.Namespace) -> str:
                 str(args.center_y_min),
                 "--center-y-max",
                 str(args.center_y_max),
-            ]
-            if args.preview_dir and page_number == 0:
-                args.preview_dir.mkdir(parents=True, exist_ok=True)
-                command.extend(
-                    ["--preview", str(args.preview_dir / f"{pdf.stem}-page1.png")]
-                )
-
-            worker = subprocess.run(
-                command,
-                text=True,
-                stdout=subprocess.PIPE,
-                stderr=subprocess.PIPE,
-                check=False,
+                "--quality-min",
+                str(args.quality_min),
+                "--quality-max",
+                str(args.quality_max),
+                "--tile-rows",
+                str(args.tile_rows),
+        ]
+        if args.preview_dir:
+            args.preview_dir.mkdir(parents=True, exist_ok=True)
+            command.extend(
+                ["--preview", str(args.preview_dir / f"{pdf.stem}-page1.png")]
             )
-            if worker.returncode != 0:
-                detail = worker.stderr.strip() or worker.stdout.strip() or "worker failed"
-                raise RuntimeError(f"page {page_number + 1}: {detail}")
-            page_pdfs.append(page_pdf)
+        if args.verbose:
+            command.append("--verbose")
+
+        worker = subprocess.run(command, text=True, check=False)
+        if worker.returncode != 0:
+            raise RuntimeError(f"book worker exited with code {worker.returncode}")
+        page_pdfs = sorted(temp_dir.glob("page-*.pdf"))
+        if len(page_pdfs) != len(original_rects):
+            raise RuntimeError(
+                f"worker produced {len(page_pdfs)} pages, expected {len(original_rects)}"
+            )
 
         pdfunite = shutil.which("pdfunite")
         if not pdfunite:
@@ -110,6 +109,8 @@ def process_pdf(pdf: Path, args: argparse.Namespace) -> str:
         )
         if merge.returncode != 0:
             raise RuntimeError(merge.stderr.strip() or "pdfunite failed")
+        if args.verbose:
+            print("merged pages", flush=True)
 
     check = fitz.open(target)
     try:
@@ -123,6 +124,15 @@ def process_pdf(pdf: Path, args: argparse.Namespace) -> str:
                 raise RuntimeError(f"page {index + 1}: page dimensions changed")
     finally:
         check.close()
+
+    output_size = target.stat().st_size
+    size_ratio = output_size / original_size
+    if not args.min_size_ratio <= size_ratio <= args.max_size_ratio:
+        target.unlink(missing_ok=True)
+        raise RuntimeError(
+            f"output size ratio {size_ratio:.1%} is outside "
+            f"{args.min_size_ratio:.0%}-{args.max_size_ratio:.0%}"
+        )
 
     backup: Path | None = None
     if args.replace:
@@ -160,6 +170,12 @@ def parse_args(argv: list[str]) -> argparse.Namespace:
     parser.add_argument("--center-x-max", type=float, default=0.88)
     parser.add_argument("--center-y-min", type=float, default=0.18)
     parser.add_argument("--center-y-max", type=float, default=0.82)
+    parser.add_argument("--quality-min", type=int, default=35)
+    parser.add_argument("--quality-max", type=int, default=100)
+    parser.add_argument("--min-size-ratio", type=float, default=0.95)
+    parser.add_argument("--max-size-ratio", type=float, default=1.05)
+    parser.add_argument("--verbose", action="store_true")
+    parser.add_argument("--tile-rows", type=int, default=256)
     return parser.parse_args(argv)
 
 

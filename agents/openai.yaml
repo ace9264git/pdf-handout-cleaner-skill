@@ -1,7 +1,7 @@
 interface:
   display_name: "PDF Center Watermark Remover"
-  short_description: "Remove center gray watermarks without downsampling."
-  default_prompt: "Use $pdf-handout-cleaner to remove the center light-gray watermark without compressing or downsampling the PDF."
+  short_description: "Remove center watermarks at near-original size."
+  default_prompt: "Use $pdf-handout-cleaner to remove the center light-gray watermark while preserving resolution and keeping file size close to the original."
 
 policy:
   allow_implicit_invocation: true
