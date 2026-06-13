@@ -1,7 +1,7 @@
 interface:
-  display_name: "PDF Handout Cleaner"
-  short_description: "Compress PDFs and remove center gray watermarks."
-  default_prompt: "Use $pdf-handout-cleaner to compress these teaching PDFs at 300 DPI and remove center light-gray watermarks."
+  display_name: "PDF Center Watermark Remover"
+  short_description: "Remove center gray watermarks without downsampling."
+  default_prompt: "Use $pdf-handout-cleaner to remove the center light-gray watermark without compressing or downsampling the PDF."
 
 policy:
   allow_implicit_invocation: true
